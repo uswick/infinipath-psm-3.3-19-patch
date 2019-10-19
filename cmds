@@ -1,0 +1,1 @@
+make PSM_HAVE_SCIF=0 clean; make PSM_HAVE_SCIF=0 DESTDIR=$PWD/psm-install install
