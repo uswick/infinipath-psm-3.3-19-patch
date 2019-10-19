@@ -792,8 +792,10 @@ __psm_ep_open_internal(psm_uuid_t const unique_job_key, int *devid_enabled,
 	    psmi_ptl_amsh.sizeof_ptl() : 0);
     if (ptl_sizes == 0) return PSM_EP_NO_DEVICE;
 
+    /*
     printf("PTL sizes = %lu  self sz = %lu  ipath sz = %lu  amshm sz = %lu\n ", 
 		    ptl_sizes, psmi_ptl_self.sizeof_ptl(), psmi_ptl_ips.sizeof_ptl(), psmi_ptl_amsh.sizeof_ptl());
+    */
 
     ep = (psm_ep_t) psmi_calloc(PSMI_EP_NONE, UNDEFINED, 1, 
 				sizeof(struct psm_ep) + ptl_sizes);

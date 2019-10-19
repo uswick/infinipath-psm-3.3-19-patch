@@ -218,8 +218,10 @@ ips_ptl_init(const psm_ep_t ep, ptl_t *ptl, ptl_ctl_t *ctl)
 
     memset(ptl, 0, sizeof(struct ptl));
 
-    printf("PTL Struct size = %lu\n ptl %p &ptl->ctl %p diff= %lu\n", 
-		    sizeof(struct ptl), ptl, &ptl->ctl, ((void*)&ptl->ctl - (void*)ptl));
+    /*
+    // printf("PTL Struct size = %lu\n ptl %p &ptl->ctl %p diff= %lu\n", 
+    //		    sizeof(struct ptl), ptl, &ptl->ctl, ((void*)&ptl->ctl - (void*)ptl));
+    */
     ptl->ep     = ep;         /* back pointer */
     ptl->epid   = ep->epid;   /* cache epid */
     ptl->epaddr = ep->epaddr; /* cache a copy */
