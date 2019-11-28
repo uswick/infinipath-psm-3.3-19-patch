@@ -86,20 +86,26 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
 //  dagger01 --> 0xd0203
 //  dagger02 --> 0xf0203
 psm_epid_t g_epids[MAX_EP_ADDR] = {0xd0203, 0xf0203};
-
+int g_epmask[MAX_EP_ADDR] = {1, 1};
 
 static int get_num_epids_known(){
-  /*return sizeof(g_epids)/sizeof(g_epids[0]);*/
-  return 1;
+  return sizeof(g_epids)/sizeof(g_epids[0]);
+  /*return 1;*/
 }
 
 static psm_epid_t* get_epids(){
-  if (!strcmp(host, "dagger01")) {
-    g_epids[0] =  0xf0203;
-  } else {
-    g_epids[0] =  0xd0203;
-  }
   return g_epids;
+}
+
+// we mask our local endpoint
+// so that ep_connect won't attempt local loopback
+static const int* get_epmask(){
+  if (!strcmp(host, "dagger01")) {
+    g_epmask[0] = 0;
+  } else {
+    g_epmask[1] = 0;
+  }
+  return (const int*) g_epmask;
 }
 
 int connect_eps(psm_net_ch_t *ch) {
@@ -108,10 +114,13 @@ int connect_eps(psm_net_ch_t *ch) {
   int num_ep = get_num_epids_known();
   psm_error_t *errors = (psm_error_t *) calloc(num_ep, sizeof(psm_error_t));
   psm_epid_t *ids = get_epids();
+  const int* mask =  get_epmask();
+
+  // debug
   printf("hostname=%s num_ep=%d ep_id[0]=%lx\n", host, num_ep, ids[0]);
   for (i = 0; i < num_ep; ++i) {
     ret = psm_ep_connect(ch->ep, num_ep, ids,
-		   NULL,  // We want to connect all epids, no mask needed
+		   mask,  // We want to connect all epids, no mask needed
 		   errors, ch->eps, 30 * 1e9);
     if(ret != PSM_OK){
       fret = ret;
