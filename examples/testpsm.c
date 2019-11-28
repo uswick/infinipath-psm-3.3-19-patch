@@ -108,6 +108,16 @@ static const int* get_epmask(){
   return (const int*) g_epmask;
 }
 
+static int get_my_rank(){
+  int r;
+  if (!strcmp(host, "dagger01")) {
+    r = 0;
+  } else {
+    r = 1;
+  }
+  return r;
+}
+
 int connect_eps(psm_net_ch_t *ch) {
 
   int i, ret, fret = PSM_OK;
@@ -117,7 +127,7 @@ int connect_eps(psm_net_ch_t *ch) {
   const int* mask =  get_epmask();
 
   // debug
-  printf("hostname=%s num_ep=%d ep_id[0]=%lx\n", host, num_ep, ids[0]);
+  printf("hostname=%s num_ep=%d ep_id[mine]=%lx\n", host, num_ep, ids[get_my_rank()]);
   for (i = 0; i < num_ep; ++i) {
     ret = psm_ep_connect(ch->ep, num_ep, ids,
 		   mask,  // We want to connect all epids, no mask needed
