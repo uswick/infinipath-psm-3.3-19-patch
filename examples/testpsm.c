@@ -117,7 +117,7 @@ int init_channel(psm_net_ch_t *ch) {
   psm_uuid_generate(job);
   int ret = try_to_initialize_psm(ch, job);
   if(ret == PSM_OK){
-    /*ret  = connect_eps(ch);*/
+    ret  = connect_eps(ch);
   }
   return ret;
 }
@@ -135,7 +135,6 @@ int main() {
   int ret = init_channel(&ch);
   printf("[%s] active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
 	 host, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
-  connect_eps(&ch);
   /*psm_finalize();*/
   return 0;
 }
