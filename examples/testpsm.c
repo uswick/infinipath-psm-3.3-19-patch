@@ -1,6 +1,9 @@
 #include <psm.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 
 typedef struct psm_net_ch {
   psm_ep_t   ep;
@@ -71,18 +74,24 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
   return err;
 }
 
-int connect_eps() { return 0; }
+int connect_eps(psm_net_ch_t *ch) { 
+	
+	
+return 0; 
+}
 
 int main() {
   psm_net_ch_t ch;
   psm_uuid_t   job;
+  char host[512];
+  gethostname(host, 512);
   psm_uuid_generate(job);
   int ret = try_to_initialize_psm(&ch, job);
-  printf("init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n", 
-		  ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
+  printf("[%s] init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n", 
+		 host, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
 
-  connect_eps();
-  psm_finalize();
+  connect_eps(&ch);
+  /*psm_finalize();*/
   return 0;
 }
 
