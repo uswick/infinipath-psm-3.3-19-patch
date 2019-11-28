@@ -127,6 +127,7 @@ int init_channel(psm_net_ch_t *ch) {
 
   psm_uuid_generate(job);
   int ret = try_to_initialize_psm(ch, job);
+  sleep(5);
   if(ret == PSM_OK){
     ret  = connect_eps(ch);
   }
