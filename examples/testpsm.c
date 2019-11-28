@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+char	 host[512];
+
 typedef struct psm_net_ch {
   psm_ep_t      ep;
   psm_epid_t    epid;
@@ -81,14 +83,22 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
 // assume we have 2 EPIDs
 // which we figured out somehow
 // generic bootstrap was not used here
+//  dagger01 --> 0xd0203
+//  dagger02 --> 0xf0203
 psm_epid_t g_epids[MAX_EP_ADDR] = {0xd0203, 0xf0203};
 
 
 static int get_num_epids_known(){
-  return sizeof(g_epids)/sizeof(g_epids[0]);
+  /*return sizeof(g_epids)/sizeof(g_epids[0]);*/
+  return 1;
 }
 
 static psm_epid_t* get_epids(){
+  if (!strcmp(host, "dagger01")) {
+    g_epids[0] =  0xf0203;
+  } else {
+    g_epids[0] =  0xd0203;
+  }
   return g_epids;
 }
 
@@ -124,7 +134,6 @@ int init_channel(psm_net_ch_t *ch) {
 
 int main() {
   psm_net_ch_t ch;
-  char	 host[512];
   bool	 isactive = false;
   gethostname(host, 512);
 
