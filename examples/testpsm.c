@@ -1,6 +1,7 @@
 #include <psm.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -84,11 +85,17 @@ int main() {
   psm_net_ch_t ch;
   psm_uuid_t   job;
   char host[512];
+  bool isactive = false;
   gethostname(host, 512);
+
+  if(!strcmp(host, "dagger01")){
+    isactive = true;
+  }
+
   psm_uuid_generate(job);
   int ret = try_to_initialize_psm(&ch, job);
-  printf("[%s] init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n", 
-		 host, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
+  printf("[%s] active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n", 
+		 host, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
 
   connect_eps(&ch);
   /*psm_finalize();*/
