@@ -1,14 +1,14 @@
 #include <psm.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
-
 typedef struct psm_net_ch {
-  psm_ep_t   ep;
-  psm_epid_t epid;
+  psm_ep_t      ep;
+  psm_epid_t    epid;
+  psm_epaddr_t *eps;  // array of endpoint addresses indexed from 0..n
 } psm_net_ch_t;
 
 int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
@@ -75,28 +75,66 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
   return err;
 }
 
-int connect_eps(psm_net_ch_t *ch) { 
-	
-	
-return 0; 
+#define MAX_EP_ADDR 2
+
+// statically initialize epids
+// assume we have 2 EPIDs
+// which we figured out somehow
+// generic bootstrap was not used here
+psm_epid_t g_epids[MAX_EP_ADDR] = {0xd0203, 0xf0203};
+
+
+static int get_num_epids_known(){
+  return sizeof(g_epids)/sizeof(g_epids[0]);
+}
+
+static psm_epid_t* get_epids(){
+  return g_epids;
+}
+
+int connect_eps(psm_net_ch_t *ch) {
+
+  int i, ret, fret = PSM_OK;
+  int num_ep = get_num_epids_known();
+  psm_error_t *errors = (psm_error_t *) calloc(num_ep, sizeof(psm_error_t));
+  psm_epid_t *ids = get_epids();
+  for (i = 0; i < num_ep; ++i) {
+    ret = psm_ep_connect(ch->ep, num_ep, ids,
+		   NULL,  // We want to connect all epids, no mask needed
+		   errors, ch->eps, 30 * 1e9);
+    if(ret != PSM_OK){
+      fret = ret;
+    }
+  }
+
+  return fret;
+}
+
+int init_channel(psm_net_ch_t *ch) {
+  psm_uuid_t job;
+  ch->eps = calloc(MAX_EP_ADDR, sizeof(psm_epaddr_t));
+
+  psm_uuid_generate(job);
+  int ret = try_to_initialize_psm(ch, job);
+  if(ret == PSM_OK){
+    /*ret  = connect_eps(ch);*/
+  }
+  return ret;
 }
 
 int main() {
   psm_net_ch_t ch;
-  psm_uuid_t   job;
-  char host[512];
-  bool isactive = false;
+  char	 host[512];
+  bool	 isactive = false;
   gethostname(host, 512);
 
-  if(!strcmp(host, "dagger01")){
+  if (!strcmp(host, "dagger01")) {
     isactive = true;
   }
 
-  psm_uuid_generate(job);
-  int ret = try_to_initialize_psm(&ch, job);
-  printf("[%s] active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n", 
-		 host, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
-
+  int ret = init_channel(&ch);
+  printf("[%s] active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
+	 host, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
   connect_eps(&ch);
   /*psm_finalize();*/
   return 0;
