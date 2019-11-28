@@ -1,0 +1,1 @@
+gcc testpsm.c  -g -I  /shared/uswickra/psm/infinipath-psm-3.1-4_g60db457_open/psm-install/usr/include/ -L/shared/uswickra/psm/infinipath-psm-3.1-4_g60db457_open/psm-install/usr/lib64 -lpsm_infinipath -linfinipath -o psm
