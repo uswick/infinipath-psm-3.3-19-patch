@@ -75,6 +75,7 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
 int main(){
   psm_net_ch_t ch;
   psm_uuid_t job; 
+  psm_uuid_generate(job);
   int ret = try_to_initialize_psm(&ch, job); 
   printf("init PSM=%d PSM_VER=%u %x\n", ret, PSM_VERNO, PSM_VERNO);
   return 0;
