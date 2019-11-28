@@ -122,12 +122,13 @@ int connect_eps(psm_net_ch_t *ch) {
 }
 
 int init_channel(psm_net_ch_t *ch) {
-  psm_uuid_t job;
+  psm_uuid_t job = "deadbeef";
   ch->eps = calloc(MAX_EP_ADDR, sizeof(psm_epaddr_t));
 
-  psm_uuid_generate(job);
+  //psm_uuid_generate(job);
   int ret = try_to_initialize_psm(ch, job);
-  sleep(5);
+  // sleeping because we dont have a barrier here
+  sleep(1);
   if(ret == PSM_OK){
     ret  = connect_eps(ch);
   }
