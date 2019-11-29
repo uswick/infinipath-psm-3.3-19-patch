@@ -1,4 +1,5 @@
 #include <psm.h>
+#include <psm_mq.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@ typedef struct ralloc {
 
 typedef struct psm_net_ch {
   psm_ep_t      ep;
+  psm_mq_t      mq;
   psm_epid_t    epid;
   psm_epaddr_t *eps;  // array of endpoint addresses indexed from 0..n
   ralloc_t *l_allocator;
@@ -92,6 +94,14 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
     // MPIU_ERR_SETANDJUMP(mpi_errno, MPI_ERR_OTHER, "**psmepopen");
     return -1;
   }
+
+  if ((err = psm_mq_init(ch->ep, PSM_MQ_ORDERMASK_NONE, NULL, 0,  &ch->mq)) != PSM_OK) {
+    fprintf(stderr, "psm_mq_init failed with error %s\n",
+	    psm_error_get_string(err));
+    // MPIU_ERR_SETANDJUMP(mpi_errno, MPI_ERR_OTHER, "**psmepopen");
+    return -1;
+  }
+   
   return err;
 }
 
@@ -212,7 +222,7 @@ typedef struct rdesc {
 
 rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = {.lbuf = NULL, .rbuf = NULL};
-  if(ch->l_allocator->next == ch->l_allocator->free){
+  if(ch->l_allocator->next >= ch->l_allocator->free){
     fprintf(stderr, "cannot allocate memory right now!\n");
     goto rmalloc_ret;
   }
