@@ -6,12 +6,21 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+#include <time.h>
 
 char	 host[512];
-uint64_t ch_size = 16;
-int      ch_unit = 4;  // n bytes units
 void     *local_base = NULL;
 void     *remote_base = NULL;
+
+/*------------------------------------------------------------*/
+/*------------------ CONFIG PARAMETERS -----------------------*/
+/*------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+uint64_t ch_size = 16;
+int      ch_unit = 4;  // n bytes units
+/*------------------------------------------------------------*/
+/*------------------------------------------------------------*/
 
 typedef struct ralloc {
   uint8_t *base;
@@ -141,6 +150,14 @@ static psm_epaddr_t get_local_ep(psm_net_ch_t *ch){
 
 static uint64_t get_ch_tag(psm_net_ch_t *ch){
   return 0xbaafeed;
+}
+
+static void print_elapsed(int rank, int iters, size_t msg_sz, double latency) {
+  printf(
+      "====== rank [%d]  msg size : [%lu] iters : "
+      "[%d] latency total :[%lf]us latency/iter "
+      ": [%lf]us\n",
+      rank, msg_sz, iters, latency / 1e3, latency / (iters* 1e3));
 }
 
 static bool is_rdma_active(){
@@ -357,7 +374,11 @@ int init_channel(psm_net_ch_t *ch) {
 int run_test(psm_net_ch_t *ch){
   int  size = sizeof(int);
   int *tmp;
-  int  i, N = 2;
+  int  i, N = get_channel_sz()/size;
+  // profiling
+  double latency = 0.0;
+  struct timespec start, end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
 
   if (is_rdma_active()) {
     for (i = 0; i < N; ++i) {
@@ -379,6 +400,10 @@ int run_test(psm_net_ch_t *ch){
       }
     }
   }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  latency = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+  print_elapsed(get_my_rank(), N, size, latency);
+
   return 0;
 }
 
