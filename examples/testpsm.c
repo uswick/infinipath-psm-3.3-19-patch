@@ -222,7 +222,12 @@ static int __init_alloc(ralloc_t *alloc, void *base, uint64_t size, int unit){
 typedef struct rdesc {
   void *lbuf;
   void *rbuf;
+  uint32_t len;
 } rdesc_t;
+
+static void* getmem(rdesc_t d){
+  return d.lbuf;
+}
 
 rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = {.lbuf = NULL, .rbuf = NULL};
@@ -234,6 +239,7 @@ rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
   uint8_t *next_buf = ch->l_allocator->base + (ch->l_allocator->next * ch->l_allocator->unit);
   ch->l_allocator->next += blks_needed;
   ret.lbuf = next_buf;
+  ret.len  = bytes;
 rmalloc_ret:
   return ret;
 }
@@ -279,10 +285,10 @@ psm_error_t psm_recv_rdma_read(psm_net_ch_t *ch, void* lbuf, uint32_t len, uint6
   return ret;
 }
 
-int rwrite(psm_net_ch_t *ch, uint32_t bytes){
-  rdesc_t ret = rmalloc(ch, bytes);
+int rwrite(psm_net_ch_t *ch, rdesc_t ret){
+  /*rdesc_t ret = rmalloc(ch, bytes);*/
   if(ret.lbuf){
-    psm_error_t code = psm_send_rdma_write(ch, ret.lbuf, bytes, get_ch_tag(ch) );
+    psm_error_t code = psm_send_rdma_write(ch, ret.lbuf, ret.len, get_ch_tag(ch) );
     if(code != PSM_OK){
       fprintf(stderr, "rwrite() send failed\n");
       return -1;
@@ -293,7 +299,7 @@ int rwrite(psm_net_ch_t *ch, uint32_t bytes){
   return 0;
 }
 
-int rread(psm_net_ch_t *ch, uint32_t bytes){
+void* rread(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = rmalloc(ch, bytes);
   int comp = 0;
   if(ret.lbuf){
@@ -301,19 +307,19 @@ int rread(psm_net_ch_t *ch, uint32_t bytes){
     psm_error_t code = psm_recv_rdma_read(ch, ret.lbuf, bytes, get_ch_tag(ch), &req);
     if(code != PSM_OK){
       fprintf(stderr, "rread() recv failed\n");
-      return -1;
+      return NULL;
     }
     while(!comp){
       comp = progress_reqs(ch->mq, &req);
       if(comp == -1){
-        return comp;
+        return NULL;
       }
     }
     
   } else {
     fprintf(stderr, "rread() allocation failed:full\n");
   }
-  return 0;
+  return ret.lbuf;
 }
 
 void init_channel_allocators(psm_net_ch_t *ch){
@@ -338,11 +344,27 @@ int init_channel(psm_net_ch_t *ch) {
   //psm_uuid_generate(job);
   int ret = try_to_initialize_psm(ch, job);
   // sleeping because we dont have a barrier here
-  sleep(1);
+  sleep(2);
   if(ret == PSM_OK){
     ret  = connect_eps(ch);
   }
   return ret;
+}
+
+int run_test(psm_net_ch_t *ch){
+  int size = sizeof(int);
+  int *tmp;
+  if (is_rdma_active()) {
+    rdesc_t ret = rmalloc(ch, size);
+    tmp = getmem(ret);
+    *tmp = 1024;
+    printf("rwrite [%p] val=%d\n", tmp, *tmp);
+    rwrite(ch, ret);
+  } else {
+    tmp = rread(ch, size);
+    printf("rread [%p] val=%d\n", tmp, *tmp);
+  }
+  return 0;
 }
 
 int main() {
@@ -355,6 +377,11 @@ int main() {
   }
 
   int ret = init_channel(&ch);
+
+  if (is_rdma_active()) {
+    isactive = true;
+  }
+
   printf("[%s] rank=%d peer=%d active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
 	 host, ch.rank_self, ch.rank_peer, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
   /*psm_finalize();*/
