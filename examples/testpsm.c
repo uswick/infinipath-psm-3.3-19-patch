@@ -386,8 +386,10 @@ int run_test(psm_net_ch_t *ch){
       tmp	 = getmem(ret);
       if (tmp) {
 	*tmp = 1024 + i;
+#if 0
 	printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base,
 	       tmp, *tmp);
+#endif
       }
       rwrite(ch, ret);
     }
@@ -395,8 +397,10 @@ int run_test(psm_net_ch_t *ch){
     for (i = 0; i < N; ++i) {
       tmp = rread(ch, size);
       if(tmp){
+#if 0
         printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
 	     *tmp);
+#endif
       }
     }
   }
