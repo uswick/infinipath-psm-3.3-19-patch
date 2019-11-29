@@ -320,6 +320,7 @@ void* rread(psm_net_ch_t *ch, uint32_t bytes){
     
   } else {
     fprintf(stderr, "rread() allocation failed:full\n");
+    return NULL;
   }
   return ret.lbuf;
 }
@@ -370,8 +371,10 @@ int run_test(psm_net_ch_t *ch){
   } else {
     for (i = 0; i < N; ++i) {
       tmp = rread(ch, size);
-      printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
+      if(tmp){
+        printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
 	     *tmp);
+      }
     }
   }
   return 0;
