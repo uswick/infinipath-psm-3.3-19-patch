@@ -363,9 +363,11 @@ int run_test(psm_net_ch_t *ch){
     for (i = 0; i < N; ++i) {
       rdesc_t ret = rmalloc(ch, size);
       tmp	 = getmem(ret);
-      *tmp	= 1024 + i;
-      printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
-	     *tmp);
+      if (tmp) {
+	*tmp = 1024 + i;
+	printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base,
+	       tmp, *tmp);
+      }
       rwrite(ch, ret);
     }
   } else {
