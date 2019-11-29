@@ -6,11 +6,26 @@
 #include <unistd.h>
 
 char	 host[512];
+uint64_t ch_size = 16;
+int      ch_unit = 4;  // n bytes units
+void     *local_base = NULL;
+void     *remote_base = NULL;
+
+typedef struct ralloc {
+  uint8_t *base;
+  uint32_t blks;
+  uint64_t size;
+  uint32_t next;
+  uint32_t free;
+  int unit;
+} ralloc_t;
 
 typedef struct psm_net_ch {
   psm_ep_t      ep;
   psm_epid_t    epid;
   psm_epaddr_t *eps;  // array of endpoint addresses indexed from 0..n
+  ralloc_t *l_allocator;
+  ralloc_t *r_allocator;
 } psm_net_ch_t;
 
 int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
@@ -97,6 +112,13 @@ static psm_epid_t* get_epids(){
   return g_epids;
 }
 
+static bool is_rdma_active(){
+  bool isactive = false;
+  if (!strcmp(host, "dagger01")) {
+    isactive = true;
+  }
+  return isactive;
+}
 // we mask our local endpoint
 // so that ep_connect won't attempt local loopback
 static const int* get_epmask(){
@@ -140,10 +162,47 @@ int connect_eps(psm_net_ch_t *ch) {
   return fret;
 }
 
+static uint64_t get_channel_sz(){
+  return ch_size;
+}
+
+static int get_channel_unit(){
+  return ch_unit;
+}
+
+static void* get_base(bool remote){
+  if(!local_base){
+    local_base = malloc(get_channel_sz());
+  }
+  return remote? remote_base: local_base;
+}
+
+static int __init_alloc(ralloc_t *alloc, void *base, uint64_t size, int unit){
+  // simple next-fit allocator
+  alloc->base = base;
+  alloc->size = size;
+  alloc->blks = (size/unit);
+  alloc->unit = unit;
+  alloc->next = 0;
+  alloc->free = alloc->blks;
+  return 0;
+}
+
+void init_channel_allocators(psm_net_ch_t *ch){
+  if(is_rdma_active()){
+    ch->r_allocator = calloc(1, sizeof(ralloc_t));
+    __init_alloc(ch->r_allocator, get_base(true), get_channel_sz(), get_channel_unit());
+  }
+  // local
+  ch->l_allocator = calloc(1, sizeof(ralloc_t));
+  __init_alloc(ch->l_allocator, get_base(false), get_channel_sz(), get_channel_unit());
+}
+
 int init_channel(psm_net_ch_t *ch) {
   psm_uuid_t job = "deadbeef";
   ch->eps = calloc(MAX_EP_ADDR, sizeof(psm_epaddr_t));
 
+  init_channel_allocators(ch);
   //psm_uuid_generate(job);
   int ret = try_to_initialize_psm(ch, job);
   // sleeping because we dont have a barrier here
@@ -159,7 +218,7 @@ int main() {
   bool	 isactive = false;
   gethostname(host, 512);
 
-  if (!strcmp(host, "dagger01")) {
+  if (is_rdma_active()) {
     isactive = true;
   }
 
