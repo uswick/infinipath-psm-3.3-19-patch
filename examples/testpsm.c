@@ -408,8 +408,8 @@ int init_channel(psm_net_ch_t *ch) {
   return ret;
 }
 
-int run_test(psm_net_ch_t *ch, int unit){
-  int  size = unit;
+int run_test(psm_net_ch_t *ch, int msz){
+  int  size = msz;
   int *tmp;
   int  i, N = get_channel_sz()/size;
   // profiling
@@ -459,14 +459,18 @@ int main() {
     isactive = true;
   }
 
+  int start_msg = sizeof(int);
+
+  set_channel_unit(start_msg);
+  set_channel_sz(Iters*start_msg);
   int ret = init_channel(&ch);
 
   if (is_rdma_active()) {
     isactive = true;
   }
 
-  for (i = sizeof(int); i <= max_msg_sz; i *= 2) {
-    if(i > sizeof(int)){
+  for (i = start_msg; i <= max_msg_sz; i *= 2) {
+    if(i > start_msg){
       set_channel_sz(Iters*i);
       init_channel_allocators(&ch);
     }
