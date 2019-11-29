@@ -358,11 +358,11 @@ int run_test(psm_net_ch_t *ch){
     rdesc_t ret = rmalloc(ch, size);
     tmp = getmem(ret);
     *tmp = 1024;
-    printf("rwrite [%p] val=%d\n", tmp, *tmp);
+    printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp, *tmp);
     rwrite(ch, ret);
   } else {
     tmp = rread(ch, size);
-    printf("rread [%p] val=%d\n", tmp, *tmp);
+    printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp, *tmp);
   }
   return 0;
 }
@@ -382,6 +382,7 @@ int main() {
     isactive = true;
   }
 
+  run_test(&ch);
   printf("[%s] rank=%d peer=%d active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
 	 host, ch.rank_self, ch.rank_peer, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
   /*psm_finalize();*/
