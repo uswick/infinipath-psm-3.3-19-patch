@@ -180,7 +180,9 @@ int connect_eps(psm_net_ch_t *ch) {
   const int* mask =  get_epmask();
 
   // debug
+#if 0
   printf("hostname=%s num_ep=%d ep_id[mine]=%lx\n", host, num_ep, ids[get_my_rank()]);
+#endif
   for (i = 0; i < num_ep; ++i) {
     ret = psm_ep_connect(ch->ep, num_ep, ids,
 		   mask,  // We want to connect all epids, no mask needed
@@ -352,17 +354,25 @@ int init_channel(psm_net_ch_t *ch) {
 }
 
 int run_test(psm_net_ch_t *ch){
-  int size = sizeof(int);
+  int  size = sizeof(int);
   int *tmp;
+  int  i, N = 2;
+
   if (is_rdma_active()) {
-    rdesc_t ret = rmalloc(ch, size);
-    tmp = getmem(ret);
-    *tmp = 1024;
-    printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp, *tmp);
-    rwrite(ch, ret);
+    for (i = 0; i < N; ++i) {
+      rdesc_t ret = rmalloc(ch, size);
+      tmp	 = getmem(ret);
+      *tmp	= 1024 + i;
+      printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
+	     *tmp);
+      rwrite(ch, ret);
+    }
   } else {
-    tmp = rread(ch, size);
-    printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp, *tmp);
+    for (i = 0; i < N; ++i) {
+      tmp = rread(ch, size);
+      printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
+	     *tmp);
+    }
   }
   return 0;
 }
