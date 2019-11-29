@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 char	 host[512];
 uint64_t ch_size = 16;
@@ -26,6 +27,8 @@ typedef struct psm_net_ch {
   psm_epaddr_t *eps;  // array of endpoint addresses indexed from 0..n
   ralloc_t *l_allocator;
   ralloc_t *r_allocator;
+  int rank_self;
+  int rank_peer;
 } psm_net_ch_t;
 
 int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
@@ -110,6 +113,20 @@ static int get_num_epids_known(){
 
 static psm_epid_t* get_epids(){
   return g_epids;
+}
+
+
+static inline psm_epaddr_t __get_ep(psm_net_ch_t *ch, int rank){
+  assert(rank < 2);
+  return ch->eps[rank];
+}
+
+static psm_epaddr_t get_peer_ep(psm_net_ch_t *ch){
+  return __get_ep(ch, ch->rank_peer);
+}
+
+static psm_epaddr_t get_local_ep(psm_net_ch_t *ch){
+  return __get_ep(ch, ch->rank_self);
 }
 
 static bool is_rdma_active(){
@@ -242,6 +259,8 @@ void init_channel_allocators(psm_net_ch_t *ch){
 int init_channel(psm_net_ch_t *ch) {
   psm_uuid_t job = "deadbeef";
   ch->eps = calloc(MAX_EP_ADDR, sizeof(psm_epaddr_t));
+  ch->rank_self = get_my_rank();
+  ch->rank_peer = (get_my_rank()+1)%2;
 
   init_channel_allocators(ch);
   //psm_uuid_generate(job);
@@ -264,8 +283,8 @@ int main() {
   }
 
   int ret = init_channel(&ch);
-  printf("[%s] active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
-	 host, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
+  printf("[%s] rank=%d peer=%d active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
+	 host, ch.rank_self, ch.rank_peer, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
   /*psm_finalize();*/
   return 0;
 }
