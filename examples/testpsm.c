@@ -139,6 +139,10 @@ static psm_epaddr_t get_local_ep(psm_net_ch_t *ch){
   return __get_ep(ch, ch->rank_self);
 }
 
+static uint64_t get_ch_tag(psm_net_ch_t *ch){
+  return 0xbaafeed;
+}
+
 static bool is_rdma_active(){
   bool isactive = false;
   if (!strcmp(host, "dagger01")) {
@@ -232,24 +236,82 @@ rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
   ret.lbuf = next_buf;
 rmalloc_ret:
   return ret;
-} 
+}
+
+int progress_reqs(psm_mq_t mq, psm_mq_req_t *req) {
+  int num_completed = 0;
+  /*psm_mq_req_t    req;*/
+  psm_mq_status_t status;
+  psm_error_t     err;
+  /*my_request_t *  myreq;*/
+
+  do {
+    err = psm_mq_ipeek(mq, req, NULL);
+    if (err == PSM_MQ_NO_COMPLETIONS)
+      return num_completed;
+    else if (err != PSM_OK)
+      goto progress_reqs_err;
+    num_completed++;
+
+    // We reached a point where req is guaranteed to complete
+    // We obtained 'req' at the head of the completion queue.  We can
+    // now free the request with PSM and obtain our original reques
+    // from the status' context
+    err = psm_mq_test(req, &status);
+    /*myreq = (my_request_t *)status.context;*/
+
+    // handle the completion for myreq whether myreq is a posted receive
+    // or a non-blocking send.
+  } while (1);
+progress_reqs_err:
+  printf("Error in request progress loop\n");
+  return -1;
+}
+
+psm_error_t psm_send_rdma_write(psm_net_ch_t *ch, void* lbuf, uint32_t len, uint64_t tag){
+  psm_error_t ret = psm_mq_send(ch->mq, get_peer_ep(ch), 0, tag, lbuf, len);
+  return ret;
+}
+
+#define TAG_SEL_ALL ((1ULL << 31) - 1)
+psm_error_t psm_recv_rdma_read(psm_net_ch_t *ch, void* lbuf, uint32_t len, uint64_t tag, psm_mq_req_t *req){
+  psm_error_t ret = psm_mq_irecv(ch->mq, tag, TAG_SEL_ALL, 0, lbuf, len, NULL, req);
+  return ret;
+}
 
 int rwrite(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = rmalloc(ch, bytes);
   if(ret.lbuf){
-    
+    psm_error_t code = psm_send_rdma_write(ch, ret.lbuf, bytes, get_ch_tag(ch) );
+    if(code != PSM_OK){
+      fprintf(stderr, "rwrite() send failed\n");
+      return -1;
+    }
   } else {
-    printf("rwrite() allocation failed:full\n");
+    fprintf(stderr, "rwrite() allocation failed:full\n");
   }
   return 0;
 }
 
 int rread(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = rmalloc(ch, bytes);
+  int comp = 0;
   if(ret.lbuf){
+    psm_mq_req_t req;
+    psm_error_t code = psm_recv_rdma_read(ch, ret.lbuf, bytes, get_ch_tag(ch), &req);
+    if(code != PSM_OK){
+      fprintf(stderr, "rread() recv failed\n");
+      return -1;
+    }
+    while(!comp){
+      comp = progress_reqs(ch->mq, &req);
+      if(comp == -1){
+        return comp;
+      }
+    }
     
   } else {
-    printf("rread() allocation failed:full\n");
+    fprintf(stderr, "rread() allocation failed:full\n");
   }
   return 0;
 }
