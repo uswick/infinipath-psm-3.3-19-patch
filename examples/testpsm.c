@@ -188,10 +188,51 @@ static int __init_alloc(ralloc_t *alloc, void *base, uint64_t size, int unit){
   return 0;
 }
 
+typedef struct rdesc {
+  void *lbuf;
+  void *rbuf;
+} rdesc_t;
+
+rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
+  rdesc_t ret = {.lbuf = NULL, .rbuf = NULL};
+  if(ch->l_allocator->next == ch->l_allocator->free){
+    fprintf(stderr, "cannot allocate memory right now!\n");
+    goto rmalloc_ret;
+  }
+  uint32_t blks_needed = bytes/ch->l_allocator->unit;
+  uint8_t *next_buf = ch->l_allocator->base + (ch->l_allocator->next * ch->l_allocator->unit);
+  ch->l_allocator->next += blks_needed;
+  ret.lbuf = next_buf;
+rmalloc_ret:
+  return ret;
+} 
+
+int rwrite(psm_net_ch_t *ch, uint32_t bytes){
+  rdesc_t ret = rmalloc(ch, bytes);
+  if(ret.lbuf){
+    
+  } else {
+    printf("rwrite() allocation failed:full\n");
+  }
+  return 0;
+}
+
+int rread(psm_net_ch_t *ch, uint32_t bytes){
+  rdesc_t ret = rmalloc(ch, bytes);
+  if(ret.lbuf){
+    
+  } else {
+    printf("rread() allocation failed:full\n");
+  }
+  return 0;
+}
+
 void init_channel_allocators(psm_net_ch_t *ch){
   if(is_rdma_active()){
     ch->r_allocator = calloc(1, sizeof(ralloc_t));
     __init_alloc(ch->r_allocator, get_base(true), get_channel_sz(), get_channel_unit());
+  } else {
+    ch->r_allocator = NULL;
   }
   // local
   ch->l_allocator = calloc(1, sizeof(ralloc_t));
