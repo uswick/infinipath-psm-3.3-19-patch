@@ -22,6 +22,26 @@ int      ch_unit = 4;  // n bytes units
 /*------------------------------------------------------------*/
 /*------------------------------------------------------------*/
 
+
+#define SEND_VAL 1000
+
+#define FOR_EACH_INT(ptr, val, num) \
+      do{\
+	/*printf("for each ptr : [%p] value : [%d] count : [%lu]\n", ptr, val, num);*/\
+        int _i;\
+	for(_i = 0; _i < (num); _i++ )\
+		*(ptr+_i) = (val);\
+      } while(0)
+
+#define FOR_EACH_ASSERT_INT(ptr, val, num) \
+      do{\
+	/*printf("for each ASSERT ptr : [%p] value : [%d] count : [%lu]\n", ptr, val, num);*/\
+        int _i;\
+	for(_i = 0; _i < (num); _i++ )\
+		assert(*(ptr+_i) == (val));\
+      } while(0)
+
+
 typedef struct ralloc {
   uint8_t *base;
   uint32_t blks;
@@ -408,12 +428,22 @@ int init_channel(psm_net_ch_t *ch) {
   return ret;
 }
 
-int run_test(psm_net_ch_t *ch, int msz){
+int cmpfunc (const void * a, const void * b) {
+   return ( *(int*)a - *(int*)b );
+}
+
+int run_test(psm_net_ch_t *ch, int msz) {
   int  size = msz;
   int *tmp;
-  int  i, N = get_channel_sz()/size;
+  int  i, N = get_channel_sz() / size;
+  int  int_chunks = size / sizeof(int);
+  if(size < sizeof(int)){
+    printf("cannot execute test -- msg size too small\n");
+    return -1;
+  }
+
   // profiling
-  double latency = 0.0;
+  double	  latency = 0.0;
   struct timespec start, end;
   clock_gettime(CLOCK_MONOTONIC, &start);
 
@@ -422,8 +452,9 @@ int run_test(psm_net_ch_t *ch, int msz){
       rdesc_t ret = rmalloc(ch, size);
       tmp	 = getmem(ret);
       if (tmp) {
-	*tmp = 1024 + i;
-#if 0
+	/**tmp = 1024 + i;*/
+	FOR_EACH_INT(tmp, (SEND_VAL + i), int_chunks);
+#if 0 
 	printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base,
 	       tmp, *tmp);
 #endif
@@ -433,13 +464,26 @@ int run_test(psm_net_ch_t *ch, int msz){
   } else {
     for (i = 0; i < N; ++i) {
       tmp = rread(ch, size);
-      if(tmp){
+      if (tmp) {
 #if 0
         printf("rread base [%p] alloc [%p] val=%d\n", ch->l_allocator->base, tmp,
 	     *tmp);
 #endif
       }
     }
+
+  // validate **ALL** recieved values
+  // we get the alloc buffer to verify
+#ifdef VALIDATE
+    uint8_t *recv_buffer = get_base(false);
+    qsort(recv_buffer, int_chunks * N, sizeof(int), cmpfunc);
+    // need to sort because messages may arrive outof order
+    for (i = 0; i < N; ++i) {
+      int *tmp = recv_buffer;
+      FOR_EACH_ASSERT_INT(ptr, (SEND_VAL + i), int_chunks);
+      recv_buffer += size;
+    }
+#endif
   }
   clock_gettime(CLOCK_MONOTONIC, &end);
   latency = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
