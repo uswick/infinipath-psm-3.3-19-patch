@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <time.h>
+#include <math.h>
 
 char	 host[512];
 void     *local_base = NULL;
@@ -440,7 +441,7 @@ int run_test(psm_net_ch_t *ch, int msz) {
   int  int_chunks = size / sizeof(int);
 
   // calc offset for each run
-  const int sendv_offset =   2*N*(size/sizeof(int));
+  const int sendv_offset =   2 * N * log2(size/sizeof(int));
   if(size < sizeof(int)){
     printf("cannot execute test -- msg size too small\n");
     return -1;
