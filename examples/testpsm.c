@@ -434,11 +434,11 @@ int cmpfunc (const void * a, const void * b) {
 }
 
 #define VALIDATE 1
-int run_test(psm_net_ch_t *ch, int msz) {
-  int  size = msz;
+int run_test(psm_net_ch_t *ch, uint32_t msz) {
+  uint32_t  size = msz;
   int *tmp;
-  int  i, N = get_channel_sz() / size;
-  int  int_chunks = size / sizeof(int);
+  uint64_t i, N = get_channel_sz() / size;
+  uint32_t int_chunks = size / sizeof(int);
 
   // calc offset for each run
   const int sendv_offset =   2 * N * log2(size/sizeof(int));
@@ -499,8 +499,9 @@ int run_test(psm_net_ch_t *ch, int msz) {
 
 int main() {
   psm_net_ch_t ch;
-  int i, Iters=8192;
-  const int max_msg_sz = 8;
+  uint64_t i, Iters=8192;
+  /*const int max_msg_sz = 8;*/
+  const uint64_t max_msg_sz = 4194304;
   bool	 isactive = false;
   gethostname(host, 512);
 
@@ -508,7 +509,7 @@ int main() {
     isactive = true;
   }
 
-  int start_msg = sizeof(int);
+  uint32_t start_msg = sizeof(int);
 
   set_channel_unit(start_msg);
   set_channel_sz(Iters*start_msg);
