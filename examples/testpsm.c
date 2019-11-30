@@ -432,6 +432,7 @@ int cmpfunc (const void * a, const void * b) {
    return ( *(int*)a - *(int*)b );
 }
 
+#define VALIDATE 1
 int run_test(psm_net_ch_t *ch, int msz) {
   int  size = msz;
   int *tmp;
@@ -479,8 +480,8 @@ int run_test(psm_net_ch_t *ch, int msz) {
     qsort(recv_buffer, int_chunks * N, sizeof(int), cmpfunc);
     // need to sort because messages may arrive outof order
     for (i = 0; i < N; ++i) {
-      int *tmp = recv_buffer;
-      FOR_EACH_ASSERT_INT(ptr, (SEND_VAL + i), int_chunks);
+      int *tmp = (int*)recv_buffer;
+      FOR_EACH_ASSERT_INT(tmp, (SEND_VAL + i), int_chunks);
       recv_buffer += size;
     }
 #endif
