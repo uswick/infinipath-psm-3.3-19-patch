@@ -20,6 +20,9 @@ void     *remote_base = NULL;
 /*------------------------------------------------------------*/
 uint64_t ch_size = 16;
 int      ch_unit = 4;  // n bytes units
+
+uint64_t ch_psm_tag_order = PSM_MQ_ORDERMASK_NONE;
+//uint64_t ch_psm_tag_order = PSM_MQ_ORDERMASK_ALL;
 /*------------------------------------------------------------*/
 /*------------------------------------------------------------*/
 
@@ -125,7 +128,7 @@ int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
     return -1;
   }
 
-  if ((err = psm_mq_init(ch->ep, PSM_MQ_ORDERMASK_NONE, NULL, 0,  &ch->mq)) != PSM_OK) {
+  if ((err = psm_mq_init(ch->ep, ch_psm_tag_order, NULL, 0,  &ch->mq)) != PSM_OK) {
     fprintf(stderr, "psm_mq_init failed with error %s\n",
 	    psm_error_get_string(err));
     // MPIU_ERR_SETANDJUMP(mpi_errno, MPI_ERR_OTHER, "**psmepopen");
