@@ -438,6 +438,9 @@ int run_test(psm_net_ch_t *ch, int msz) {
   int *tmp;
   int  i, N = get_channel_sz() / size;
   int  int_chunks = size / sizeof(int);
+
+  // calc offset for each run
+  const int sendv_offset =   2*N*(size/sizeof(int));
   if(size < sizeof(int)){
     printf("cannot execute test -- msg size too small\n");
     return -1;
@@ -454,7 +457,7 @@ int run_test(psm_net_ch_t *ch, int msz) {
       tmp	 = getmem(ret);
       if (tmp) {
 	/**tmp = 1024 + i;*/
-	FOR_EACH_INT(tmp, (SEND_VAL + i), int_chunks);
+	FOR_EACH_INT(tmp, (SEND_VAL + sendv_offset + i), int_chunks);
 #if 0 
 	printf("rwrite base [%p] alloc [%p] val=%d\n", ch->l_allocator->base,
 	       tmp, *tmp);
@@ -481,7 +484,7 @@ int run_test(psm_net_ch_t *ch, int msz) {
     // need to sort because messages may arrive outof order
     for (i = 0; i < N; ++i) {
       int *tmp = (int*)recv_buffer;
-      FOR_EACH_ASSERT_INT(tmp, (SEND_VAL + i), int_chunks);
+      FOR_EACH_ASSERT_INT(tmp, (SEND_VAL + sendv_offset + i), int_chunks);
       recv_buffer += size;
     }
 #endif
