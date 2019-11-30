@@ -47,8 +47,8 @@ typedef struct ralloc {
   uint8_t *base;
   uint32_t blks;
   uint64_t size;
-  uint32_t next;
-  uint32_t free;
+  uint64_t next;
+  uint64_t free;
   int unit;
 } ralloc_t;
 
@@ -260,7 +260,12 @@ static void set_base(bool remote, void* b){
 static void* get_base(bool remote){
   if(!local_base){
     /*local_base = malloc(get_channel_sz());*/
-    set_base(false, malloc(get_channel_sz()));
+    void* mem = malloc(get_channel_sz());
+    if(!mem){
+      printf("local allocator malloc() failed\n");
+      assert(0);
+    }
+    set_base(false, mem);
   }
   return remote? remote_base: local_base;
 }
@@ -293,7 +298,7 @@ rdesc_t rmalloc(psm_net_ch_t *ch, uint32_t bytes){
     fprintf(stderr, "cannot allocate memory right now!\n");
     goto rmalloc_ret;
   }
-  uint32_t blks_needed = bytes/ch->l_allocator->unit;
+  uint64_t blks_needed = bytes/ch->l_allocator->unit;
   uint8_t *next_buf = ch->l_allocator->base + (ch->l_allocator->next * ch->l_allocator->unit);
   ch->l_allocator->next += blks_needed;
   ret.lbuf = next_buf;
@@ -433,7 +438,7 @@ int cmpfunc (const void * a, const void * b) {
    return ( *(int*)a - *(int*)b );
 }
 
-#define VALIDATE 1
+//#define VALIDATE 1
 int run_test(psm_net_ch_t *ch, uint32_t msz) {
   uint32_t  size = msz;
   int *tmp;
