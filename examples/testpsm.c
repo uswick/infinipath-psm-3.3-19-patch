@@ -45,7 +45,7 @@ int      ch_unit = 4;  // n bytes units
 
 typedef struct ralloc {
   uint8_t *base;
-  uint32_t blks;
+  uint64_t blks;
   uint64_t size;
   uint64_t next;
   uint64_t free;
