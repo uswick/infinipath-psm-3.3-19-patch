@@ -55,6 +55,14 @@ typedef struct ralloc {
   int unit;
 } ralloc_t;
 
+typedef struct rdesc {
+  void *lbuf;
+  void *rbuf;
+  uint32_t len;
+  psm_mq_req_t req;
+  struct rdesc *next;
+} rdesc_t;
+
 typedef struct psm_net_ch {
   psm_ep_t      ep;
   psm_mq_t      mq;
@@ -64,6 +72,8 @@ typedef struct psm_net_ch {
   ralloc_t *r_allocator;
   int rank_self;
   int rank_peer;
+  rdesc_t *prepost_list;
+  rdesc_t **prepost_next;
 } psm_net_ch_t;
 
 int try_to_initialize_psm(psm_net_ch_t *ch, psm_uuid_t job_uuid) {
@@ -285,11 +295,6 @@ static int __init_alloc(ralloc_t *alloc, void *base, uint64_t size, int unit){
   return 0;
 }
 
-typedef struct rdesc {
-  void *lbuf;
-  void *rbuf;
-  uint32_t len;
-} rdesc_t;
 
 static void* getmem(rdesc_t d){
   return d.lbuf;
@@ -365,18 +370,47 @@ int rwrite(psm_net_ch_t *ch, rdesc_t ret){
   return 0;
 }
 
-void* rread(psm_net_ch_t *ch, uint32_t bytes){
+void* rread_prepost(psm_net_ch_t *ch, uint32_t bytes){
   rdesc_t ret = rmalloc(ch, bytes);
   int comp = 0;
   if(ret.lbuf){
-    psm_mq_req_t req;
-    psm_error_t code = psm_recv_rdma_read(ch, ret.lbuf, bytes, get_ch_tag(ch), &req);
+    rdesc_t * nd = malloc(sizeof(rdesc_t));
+    nd->next = NULL;
+    *nd = ret;
+    // psm_mq_req_t req;
+    // append to the prepost queue
+    *ch->prepost_next = nd;
+    ch->prepost_next  = &nd->next;
+    
+    psm_error_t code = psm_recv_rdma_read(ch, ret.lbuf, bytes, get_ch_tag(ch), &nd->req);
     if(code != PSM_OK){
       fprintf(stderr, "rread() recv failed\n");
       return NULL;
     }
+  } else {
+    fprintf(stderr, "rread() allocation failed:full\n");
+    return NULL;
+  }
+  return ret.lbuf;
+}
+
+void* rread(psm_net_ch_t *ch, uint32_t bytes){
+  /*rdesc_t ret = rmalloc(ch, bytes);*/
+  void* ret_buf = NULL;
+  // take head of the queue
+  rdesc_t *ret = ch->prepost_list;
+  int comp = 0;
+  if(ret && ret->lbuf){
+    psm_mq_req_t* req = &ret->req;
+    ret_buf           = ret->lbuf;
+    ch->prepost_list  = ret->next;
+    if(!ret->next){
+      // is the last item on prepost list
+      ch->prepost_next = &ch->prepost_list; 
+    } 
+    free(ret);
     while(!comp){
-      comp = progress_reqs(ch->mq, &req);
+      comp = progress_reqs(ch->mq, req);
       if(comp == -1){
         return NULL;
       }
@@ -386,7 +420,7 @@ void* rread(psm_net_ch_t *ch, uint32_t bytes){
     fprintf(stderr, "rread() allocation failed:full\n");
     return NULL;
   }
-  return ret.lbuf;
+  return ret_buf;
 }
 
 void init_channel_allocators(psm_net_ch_t *ch){
@@ -425,6 +459,8 @@ int init_channel(psm_net_ch_t *ch) {
   ch->eps = calloc(MAX_EP_ADDR, sizeof(psm_epaddr_t));
   ch->rank_self = get_my_rank();
   ch->rank_peer = (get_my_rank()+1)%2;
+  ch->prepost_list = NULL;
+  ch->prepost_next = &ch->prepost_list;
 
   init_channel_allocators(ch);
   //psm_uuid_generate(job);
@@ -476,6 +512,10 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
     }
   } else {
     for (i = 0; i < N; ++i) {
+      rread_prepost(ch, size);
+    }
+
+    for (i = 0; i < N; ++i) {
       tmp = rread(ch, size);
       if (tmp) {
 #if 0
@@ -485,14 +525,14 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
       }
     }
 
-  // validate **ALL** recieved values
-  // we get the alloc buffer to verify
+// validate **ALL** recieved values
+// we get the alloc buffer to verify
 #ifdef VALIDATE
     uint8_t *recv_buffer = get_base(false);
     qsort(recv_buffer, int_chunks * N, sizeof(int), cmpfunc);
     // need to sort because messages may arrive outof order
     for (i = 0; i < N; ++i) {
-      int *tmp = (int*)recv_buffer;
+      int *tmp = (int *)recv_buffer;
       FOR_EACH_ASSERT_INT(tmp, (SEND_VAL + sendv_offset + i), int_chunks);
       recv_buffer += size;
     }
@@ -508,8 +548,8 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
 int main() {
   psm_net_ch_t ch;
   uint64_t i, Iters=8192;
-  /*const int max_msg_sz = 8;*/
-  const uint64_t max_msg_sz = 4194304;
+  const int max_msg_sz = 8;
+  /*const uint64_t max_msg_sz = 4194304;*/
   bool	 isactive = false;
   gethostname(host, 512);
 
