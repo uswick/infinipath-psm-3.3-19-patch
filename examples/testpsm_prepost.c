@@ -315,7 +315,7 @@ rmalloc_ret:
   return ret;
 }
 
-int progress_reqs(psm_mq_t mq, psm_mq_req_t *req) {
+int progress_reqs(psm_net_ch_t *ch, psm_mq_req_t *req) {
   int num_completed = 0;
   /*psm_mq_req_t    req;*/
   psm_mq_status_t status;
@@ -323,23 +323,32 @@ int progress_reqs(psm_mq_t mq, psm_mq_req_t *req) {
   /*my_request_t *  myreq;*/
 
   do {
-    err = psm_mq_ipeek(mq, req, NULL);
-    if (err == PSM_MQ_NO_COMPLETIONS)
-      return num_completed;
-    else if (err != PSM_OK)
-      goto progress_reqs_err;
-    num_completed++;
+    /*err = psm_mq_ipeek(mq, req, NULL);*/
+    // progress at least once
+    psm_poll(ch->ep);
+    /*if (err == PSM_MQ_NO_COMPLETIONS)*/
+      /*return num_completed;*/
+    /*else if (err != PSM_OK)*/
+      /*goto progress_reqs_err;*/
+    /*num_completed++;*/
 
     // We reached a point where req is guaranteed to complete
     // We obtained 'req' at the head of the completion queue.  We can
     // now free the request with PSM and obtain our original reques
     // from the status' context
     err = psm_mq_test(req, &status);
+    if(err == PSM_MQ_NO_COMPLETIONS){
+      return 0;
+    } else if(err == PSM_OK) {
+      return 1;
+    } else {
+      goto progress_reqs_err;
+    }
     /*myreq = (my_request_t *)status.context;*/
 
     // handle the completion for myreq whether myreq is a posted receive
     // or a non-blocking send.
-  } while (1);
+  } while (0);
 progress_reqs_err:
   printf("Error in request progress loop\n");
   return -1;
@@ -376,7 +385,10 @@ void* rread_prepost(psm_net_ch_t *ch, uint32_t bytes){
   if(ret.lbuf){
     rdesc_t * nd = malloc(sizeof(rdesc_t));
     nd->next = NULL;
-    *nd = ret;
+    nd->lbuf = ret.lbuf;
+    nd->rbuf = ret.rbuf;
+    nd->len  = ret.len;
+    /**nd = ret;*/
     // psm_mq_req_t req;
     // append to the prepost queue
     *ch->prepost_next = nd;
@@ -409,7 +421,7 @@ void* rread(psm_net_ch_t *ch, uint32_t bytes){
       ch->prepost_next = &ch->prepost_list; 
     } 
     while(!comp){
-      comp = progress_reqs(ch->mq, req);
+      comp = progress_reqs(ch, req);
       if(comp == -1){
         return NULL;
       }
@@ -547,7 +559,7 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
 int main() {
   psm_net_ch_t ch;
   uint64_t i, Iters=8192;
-  const int max_msg_sz = 8;
+  const int max_msg_sz = 4;
   /*const uint64_t max_msg_sz = 4194304;*/
   bool	 isactive = false;
   gethostname(host, 512);
