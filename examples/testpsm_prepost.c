@@ -408,14 +408,13 @@ void* rread(psm_net_ch_t *ch, uint32_t bytes){
       // is the last item on prepost list
       ch->prepost_next = &ch->prepost_list; 
     } 
-    free(ret);
     while(!comp){
       comp = progress_reqs(ch->mq, req);
       if(comp == -1){
         return NULL;
       }
     }
-    
+    free(ret);
   } else {
     fprintf(stderr, "rread() allocation failed:full\n");
     return NULL;
