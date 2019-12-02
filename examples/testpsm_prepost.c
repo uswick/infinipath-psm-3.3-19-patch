@@ -60,6 +60,7 @@ typedef struct rdesc {
   void *rbuf;
   uint32_t len;
   psm_mq_req_t req;
+  bool req_complete;
   struct rdesc *next;
 } rdesc_t;
 
@@ -385,6 +386,7 @@ void* rread_prepost(psm_net_ch_t *ch, uint32_t bytes){
   if(ret.lbuf){
     rdesc_t * nd = malloc(sizeof(rdesc_t));
     nd->next = NULL;
+    nd->req_complete = false;
     nd->lbuf = ret.lbuf;
     nd->rbuf = ret.rbuf;
     nd->len  = ret.len;
@@ -399,6 +401,8 @@ void* rread_prepost(psm_net_ch_t *ch, uint32_t bytes){
       fprintf(stderr, "rread() recv failed\n");
       return NULL;
     }
+    // optimize by progressing once
+    nd->req_complete = (progress_reqs(ch, &nd->req) == 1)?true:false;
   } else {
     fprintf(stderr, "rread() allocation failed:full\n");
     return NULL;
@@ -420,10 +424,12 @@ void* rread(psm_net_ch_t *ch, uint32_t bytes){
       // is the last item on prepost list
       ch->prepost_next = &ch->prepost_list; 
     } 
-    while(!comp){
-      comp = progress_reqs(ch, req);
-      if(comp == -1){
-        return NULL;
+    if(!ret->req_complete){
+      while (!comp) {
+	comp = progress_reqs(ch, req);
+	if (comp == -1) {
+	  return NULL;
+	}
       }
     }
     free(ret);
