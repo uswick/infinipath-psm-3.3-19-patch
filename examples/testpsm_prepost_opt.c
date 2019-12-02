@@ -579,11 +579,11 @@ static void printmq_stats(psm_net_ch_t *ch){
 		  );
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   psm_net_ch_t ch;
   uint64_t i, Iters=8192;
   //const int max_msg_sz = 2097152;
-  const uint64_t max_msg_sz = 4194304;
+  uint64_t max_msg_sz = 4194304;
   bool	 isactive = false;
   gethostname(host, 512);
 
@@ -595,7 +595,10 @@ int main() {
   }
 
   //uint32_t start_msg = sizeof(int);
-  uint32_t start_msg = 4194304;
+  uint64_t start_msg = 4194304;
+  if (argc > 1) {
+    max_msg_sz = start_msg = atoi(argv[1]);
+  }
 
   set_channel_unit(start_msg);
   set_channel_sz(Iters*start_msg);
