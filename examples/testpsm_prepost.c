@@ -560,7 +560,7 @@ static void printmq_stats(psm_net_ch_t *ch){
   psm_mq_stats_t stat;
   psm_mq_get_stats(ch->mq, &stat);
 
-  printf("[rank=%d] SEND[[RNDV msgs=%lu, bytes=%lu] [EAGER msgs=%lu bytes=%lu] Total=%lu] RECV[[RNDV msgs=%lu, bytes=%lu] [SYS msgs=%lu bytes=%lu] [SYS_BUFFERS alloc=%lu bytes=%lu]]\n",
+  printf("[rank=%d] SEND[[RNDV msgs=%lu, bytes=%lu] [EAGER msgs=%lu bytes=%lu] Total=%lu] RECV[[USERBUF msgs=%lu, bytes=%lu] [SYS msgs=%lu bytes=%lu] [SYS_BUFFERS alloc=%lu bytes=%lu]]\n",
 		  get_my_rank(),
 		  stat.tx_rndv_num, stat.tx_rndv_bytes, 
 		  stat.tx_eager_num, stat.tx_eager_bytes, 
