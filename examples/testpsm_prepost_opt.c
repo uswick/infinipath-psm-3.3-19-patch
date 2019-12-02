@@ -193,6 +193,7 @@ static void print_elapsed(int rank, int iters, size_t msg_sz, double latency) {
       "[%d] latency total :[%lf]us latency/iter "
       ": [%lf]us\n",
       rank, msg_sz, iters, latency / 1e3, latency / (iters* 1e3));
+  fflush(stdout);
 }
 
 static bool is_rdma_active(){
@@ -273,13 +274,7 @@ static void set_base(bool remote, void* b){
 
 static void* get_base(bool remote){
   if(!local_base){
-    /*local_base = malloc(get_channel_sz());*/
-    void* mem = malloc(get_channel_sz());
-    if(!mem){
-      printf("local allocator malloc() failed\n");
-      assert(0);
-    }
-    set_base(false, mem);
+    assert(1);
   }
   return remote? remote_base: local_base;
 }
@@ -402,7 +397,7 @@ void* rread_prepost(psm_net_ch_t *ch, uint32_t bytes){
       return NULL;
     }
     // optimize by progressing once
-    nd->req_complete = (progress_reqs(ch, &nd->req) == 1)?true:false;
+    //nd->req_complete = (progress_reqs(ch, &nd->req) == 1)?true:false;
   } else {
     fprintf(stderr, "rread() allocation failed:full\n");
     return NULL;
@@ -520,6 +515,7 @@ int run_test(psm_net_ch_t *ch, uint32_t msz, bool enable_profile) {
     for (i = 0; i < N; ++i) {
       rdesc_t ret = rmalloc(ch, size);
       tmp	 = getmem(ret);
+#ifdef VALIDATE
       if (tmp) {
 	/**tmp = 1024 + i;*/
 	FOR_EACH_INT(tmp, (SEND_VAL + sendv_offset + i), int_chunks);
@@ -528,6 +524,7 @@ int run_test(psm_net_ch_t *ch, uint32_t msz, bool enable_profile) {
 	       tmp, *tmp);
 #endif
       }
+#endif
       rwrite(ch, ret);
     }
   } else {
@@ -585,8 +582,8 @@ static void printmq_stats(psm_net_ch_t *ch){
 int main() {
   psm_net_ch_t ch;
   uint64_t i, Iters=8192;
-  const int max_msg_sz = 4;
-  /*const uint64_t max_msg_sz = 4194304;*/
+  //const int max_msg_sz = 2097152;
+  const uint64_t max_msg_sz = 4194304;
   bool	 isactive = false;
   gethostname(host, 512);
 
@@ -597,7 +594,8 @@ int main() {
     isactive = true;
   }
 
-  uint32_t start_msg = sizeof(int);
+  //uint32_t start_msg = sizeof(int);
+  uint32_t start_msg = 4194304;
 
   set_channel_unit(start_msg);
   set_channel_sz(Iters*start_msg);
@@ -607,12 +605,13 @@ int main() {
     isactive = true;
   }
   // warmup run with largest possible messages
+  /*
   for (i = max_msg_sz; i <= max_msg_sz; i *= 2) {
     cleanup_channel_allocators(&ch); 
     set_channel_sz(Iters*i);
     init_channel_allocators(&ch);
     run_test(&ch, i, false);
-  }
+  }*/
 
   //actual run
   for (i = start_msg; i <= max_msg_sz; i *= 2) {
