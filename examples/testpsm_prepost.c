@@ -556,6 +556,21 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
   return 0;
 }
 
+static void printmq_stats(psm_net_ch_t *ch){
+  psm_mq_stats_t stat;
+  psm_mq_get_stats(ch->mq, &stat);
+
+  printf("[%d] SEND[[RNDV msgs=%lu, bytes=%lu] [EAGER msgs=%lu bytes=%lu] Total=%lu] RECV[[RNDV msgs=%lu, bytes=%lu] [SYS msgs=%lu bytes=%lu] [SYS_BUFFERS alloc=%lu bytes=%lu]]",
+		  get_my_rank(),
+		  stat.tx_rndv_num, stat.tx_rndv_bytes, 
+		  stat.tx_eager_num, stat.tx_eager_bytes, 
+		  stat.tx_num,
+		  stat.rx_user_num, stat.rx_user_bytes,
+		  stat.rx_sys_num, stat.rx_sys_bytes,
+		  stat.rx_sysbuf_num, stat.rx_sysbuf_bytes
+		  );
+}
+
 int main() {
   psm_net_ch_t ch;
   uint64_t i, Iters=8192;
@@ -589,6 +604,7 @@ int main() {
   }
   printf("[%s] rank=%d peer=%d active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
 	 host, ch.rank_self, ch.rank_peer, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
+  printmq_stats(&ch);
   /*psm_finalize();*/
   return 0;
 }
