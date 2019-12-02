@@ -464,11 +464,12 @@ void cleanup_channel_allocators(psm_net_ch_t *ch){
     ch->l_allocator = NULL;
   }
   
+  /*
   void *local = get_base(false);
   if(local){
     free(local);
     set_base(false, NULL);
-  }
+  }*/
 }
 
 int init_channel(psm_net_ch_t *ch) {
@@ -495,7 +496,7 @@ int cmpfunc (const void * a, const void * b) {
 }
 
 //#define VALIDATE 1
-int run_test(psm_net_ch_t *ch, uint32_t msz) {
+int run_test(psm_net_ch_t *ch, uint32_t msz, bool enable_profile) {
   uint32_t  size = msz;
   int *tmp;
   uint64_t i, N = get_channel_sz() / size;
@@ -511,7 +512,9 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
   // profiling
   double	  latency = 0.0;
   struct timespec start, end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  if(enable_profile){
+    clock_gettime(CLOCK_MONOTONIC, &start);
+  }
 
   if (is_rdma_active()) {
     for (i = 0; i < N; ++i) {
@@ -555,10 +558,12 @@ int run_test(psm_net_ch_t *ch, uint32_t msz) {
     }
 #endif
   }
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  latency = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
-  print_elapsed(get_my_rank(), N, size, latency);
 
+  if(enable_profile){
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    latency = 1e9 * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+    print_elapsed(get_my_rank(), N, size, latency);
+  }
   return 0;
 }
 
@@ -585,6 +590,9 @@ int main() {
   bool	 isactive = false;
   gethostname(host, 512);
 
+  //pre init allocator base addr
+  set_base(false, malloc(max_msg_sz*Iters));
+  
   if (is_rdma_active()) {
     isactive = true;
   }
@@ -598,15 +606,20 @@ int main() {
   if (is_rdma_active()) {
     isactive = true;
   }
-
-  for (i = start_msg; i <= max_msg_sz; i *= 2) {
-    if(i > start_msg){
-      set_channel_sz(Iters*i);
-      init_channel_allocators(&ch);
-    }
-    run_test(&ch, i);
-    // cleanup allocator buffers
+  // warmup run with largest possible messages
+  for (i = max_msg_sz; i <= max_msg_sz; i *= 2) {
     cleanup_channel_allocators(&ch); 
+    set_channel_sz(Iters*i);
+    init_channel_allocators(&ch);
+    run_test(&ch, i, false);
+  }
+
+  //actual run
+  for (i = start_msg; i <= max_msg_sz; i *= 2) {
+    cleanup_channel_allocators(&ch); 
+    set_channel_sz(Iters*i);
+    init_channel_allocators(&ch);
+    run_test(&ch, i, true);
   }
   printf("[%s] rank=%d peer=%d active?%d init PSM=%d PSM_VER=%u [%x] PSM_EPID %llu [%llx]\n",
 	 host, ch.rank_self, ch.rank_peer, isactive, ret, PSM_VERNO, PSM_VERNO, ch.epid, ch.epid);
