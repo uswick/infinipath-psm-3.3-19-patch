@@ -99,3 +99,29 @@ PSM/IPS-PTL Low level protocols
 
 
 
+PSM's high level packet transport layer protocol (PTL) is responsible for reliably transfering packets over from local endpoint to the destinaton.
+In recieve progress loop, PSM tries to test whether any of the requests are matched with the requests located in the expected queue. If any match was not found incoming requests are moved into a special queue called unexpected queue.
+For each recieve request, they are also matched against the expected requests. Again If this matching fails then incoming request is appended to the expected queue.
+In case of a succesful recieve match or send request, PSM triggers the respective protocol control flow to retrieve or transfer the message.
+
+PSM use 2 different low level transport modes for RDMA. 
+a) PIO -- programmed IO
+b) SDMA -- Asynchronous DMA requests
+
+For eager messages the payload is generally contained along with the metadata and PIO method is used. In this case sender packs the matching tags and source information and then sends the request using PIO. 
+Sometimes if the message is too small then a payload is not sent. Instead, data is inlined with the PIO message header (psm send control block(scb) header). A PIO request is handled by enqueing the request in a PIO send queue and then trigerring an interrupt timer or fommand. This will eventually write the PIO descriptors to the NIC. Medium sized messages may be handled different where the PTL layer may fragment the message into MTU packets for send and reliable delivery is taken care of.
+A rendezvous protocol is implemented for Large messages in two stages. 
+A succesful match triggers a request to initiate the actual large message transfer. 
+PSM employs two methods for rendezvous RDMA. 
+  a) Eager send back
+  b) Expected TID transfer 
+
+In Eager send, First the initiator send a RTS control request (with a reference to the initiating request) along with matching metadata. 
+A succesful match then triggers a CTS request from the reciever side to initiate sending payload. Once CTS acknowledgement is recieved, the initiator may start transfering payload in MTU packets using PIO.
+
+A more efficient method is to switch to an expected TID protocol where initiator sends the token for SDMA buffer along with meta data. In this case the reciever registers an expected TID token get operation for the reciever RDMA buffer and then sends a control packet with requested matching token (sent by the initator) to start the transfer. 
+Get requests, issued by MQ when there's a match on a large message.  Unlike an RDMA get, the initiator identifies the location of the data at the target using a 'send token' instead of a virtual address.  This, of course, assumes that the target has already registered the token and communicated it to the initiator beforehand (it actually sends the token as part of the initial MQ message that contains the MQ tag). The operation is semantically a two-sided RDMA get.
+
+Once the request is recieved a DMA transfer is taken place corresponding to the buffer location that will send data from DMA buffer to the NIC interface destined towards the reciever side. 
+Reciever side will trigger another DMA transfer from incoming packets to its recieve buffers and request is completed once all packets are transferred.
+
