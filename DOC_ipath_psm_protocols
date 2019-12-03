@@ -1,6 +1,3 @@
-
-https://www.youtube.com/watch?v=rbB2drMqGPU
-
 ++++++++++++++Notes+++++++++++++++
 The Intel® Performance Scaled Messaging 2 (Intel® PSM2) API is a high-performance, vendor-specific protocol that provides a low-level communications interface for the Intel® Omni-Path family of products. PSM2 enables mechanisms necessary to implement higher levelcommunications interfaces in parallel environments.
 
