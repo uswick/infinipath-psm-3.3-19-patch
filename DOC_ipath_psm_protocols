@@ -36,6 +36,66 @@ While psm2_poll is the only way to directly ensure progress, other MQ functions 
 psm2_mq_wait and psm2_mq_wait2 employ polling and wait until the request is completed. For blocking communication operations where the caller is waiting on a single send or receive to complete, psm2_mq_wait or psm2_mq_wait2 usually provides the best responsiveness in terms of latency.
 • psm2_mq_test and psm2_mq_test2 test a particular request for completion, but never directly or indirectly ensure progress because they only test the completion status of a request, nothing more. See functional documentation for psm2_mq_test and psm2_mq_test2 for details.
 
+
+Infiniband Verbs----------------
+The InfiniBandTM standard offers different transport services like stream or datagram to the user.
+Each transport service has special features and shows different communication times and overheads. Additionally, different transport functions can be performed with each transport service
+(see Table 36 at Page 245 in the InfiniBandTM specification [199]). We call a combination of transport function and transport service transport type. All different transport types have to be analyzed
+in order to draw an accurate conclusion for the implementation of a parallel algorithm or a collective operation. The different transport types are briefly explained in the following
+
+This section briefly explains the different transport services that are defined in the InfiniBandTM
+specification.
+ * Unreliable Connection The Unreliable Connection (UC) offers point-to-point transmission based
+on unreliable connections without flow control. Packets may be silently discarded during transmission. A queue pair (QP) has to be created at each host and connected to each other in order to
+transmit any data. The queue pair acts as a connection and endpoint identifier.
+ * Reliable Connection The Reliable Connection (RC) is basically identical to UC despite the fact
+that the correct in-order transmission of packets is guaranteed by the InfiniBandTM hardware. An
+automatic retransmission and flow control mechanism is used to ensure correct delivery even if
+slight network errors occur. The role of the QPs remains the same as for UC.
+ * Unreliable Datagram The Unreliable Datagram (UD) transport type offers connectionless data
+delivery. The reception or in-order delivery is not guaranteed in this case. QPs are only used
+to send or receive packets and each packet can have a different destination (they do not denote
+a virtual channel as for UC/RC). A single datagram must not exceed the MTU of the network
+(typically 2KiB).
+ * Reliable Datagram The Reliable Datagram (RD) transport type adds a guaranteed reliable in
+order delivery to UD. QPs can be used to reach any target as in the UD case. RD is currently not
+supported in our test system.
+RAW The RAW Transport type can be used to encapsulate other transmission protocols as Ethernet or IPv6. It has nearly the same characteristics as UD and will not be discussed in the following.
+
+In this section, the possible transport functions are discussed and bound to a specific transport type
+for the benchmark.
+Send The simple send function is available for all IBA transport services and will be measured
+for all of them.
+RDMA Write The Remote Direct Memory Access Write (RDMA-W) can write to explicitly registered memory at a target without the need to interrupt the target’s CPU. RDMA-W can be used atop
+RC, UC and RD. We present results for RDMA-W atop RC because RD is currently not supported.
+RDMA Read The Remote Direct Memory Access Read (RDMA-R) can read from registered memory at a target system without influencing the remote CPU. RDMA-R can be used atop RC and RD.
+We present results for RDMA-R atop RC because RD is currently not supported.
+Atomic Operations Atomic Operations (AO) can be useful to support interprocess synchronization calls. Our current system does not support the optional AOs and we cannot present any measurement values.
+
+[cite -- Infiniband specification]
 ############ Infinipath - PSM
 
-Infinipath PSM is  
+Infiniband standard specifies transport services for RDMA based communication. 
+In general Infiniband advocates different types of transport services and functions that may be performed on the service. However not all hardware vendors may support all aspects of the specification, while some others may support only a minimal subset. Thus capabilities and features may vastly differ depending on the fabric HCA vendor. Following explains the transport services that are defined in the InfiniBandTM specification.
+
+RC (Reliable Connection) -- Specifies connection oriented (i.e. state-full) tranport protocol. The connection is also a reliable point to point transmission protocols with flow control enabled. Thus messages are delivered in order without loss. Because of the reliability guarantees this mode of transports may have a higher cost associated with it.
+UC (Unreliable Connection) -- Specifies a connection oriented transport service without flow control. Packets may be siliently dropped during transmission. Thus, this mode of transport may guarantee in-order delivery, but all packets may not be delivered. 
+RD (Reliable Datagram) -- Specifies a connection less (i.e. state less) transport service without packet loss and flow control. Thus this mode of transport does not guarantee in-order delivery. 
+RD (Unreliable Datagram) -- Specifies a connection less (i.e. state less) transport service that does not guarantee reception or in-order delivery. 
+
+
+
+All aforementioned Infiniband RC, UC, UD, RD services may be backed up by one sided RDMA read, write, atomic operations as well as loosely two-sided Send/Recv type operations. As noted earlier, the software support for fine grained opeartions and QP completion events/notifications may differ by the vendor. Variants of Infiniband implementations are also present in Intel and Qlogic fabrics. Similar to Cray and other Infiniband systems these HCAs may vary widely in hardware features supported and the protcol mode features for RDMA.
+We utilized Intel Performance Scaled Messaging(PSM) library to build a base infiniband ``backend'' 'implementation for \rmalloc. PSM API~\footnote{PSM comes in two flavours PSM and PSM2 that was supported on Infini-path and Omni-patg family of products respectively. PSM and PSM support 64-bit and 96-bit tag formats respectively} is a high performance vendor specific protocol which provides a low level communication interface for Intel Omni/Infi-Path family of products. PSM API's target shared memory and internode modes for communication. Because PSM in general carries hardware specific optimizations in its userspace driver library, it exhibits greater performance enhancements for native HCAs than using Infiniband Verbs or similar library adapted for the Intel driver.
+PSM2 also follows an endpoint based communication model where one or more endpoints are initiated per node before any communication takes place. The initiation phase is loosely coupled into two stages. In the first stage, user opens an endpoint (\texttt{psm\_ep\_open}), to obtain an opaque handle for all connect, communication and progress functions. Just before the second stage of connecting endpoints (\texttt{psm\_ep\_connect}), user distributes all relevant endpoint identifiers through an out-of-band bootstrap mechanism. Once the endpoint identifiers are successfully distributed to all processes that wish to communicate, the may be used to connect to the remote endpoint.
+
+Although PSM2 exposes a single endpoint initialization model, it enables various levels of communication functionality and semantics via its components. Two major components available in PSM and PSM2 are Matched Queues and Active Messages. Matched Queues (PSM MQ) present a queue-based communication model with the distinction that queue consumers may use tags to match incoming messages against a list of posted receive requests (\texttt{psm\_mq\_irecv}). Active messaging mode (PSM AM) follows the active message semantics where a remote handler is executed from a set of pre registered PSM handler functions. However, AM mode does not expose any direct RDMA buffers or routines. In MQ mode, a loose two sided RDMA semantics are followed for large messages with actual transfer being performed after a succesful match. Message completion in MQ mode follows local completion and thus source data is generally safe for reuse. Unlike MPI, PSM requires explicit network operations or implicit conditional operations to ensure network progress. For example , \texttt{psm\_poll}, is the most general form of ensuring progress on a given endpoint. Other progress operations such as \texttt{psm\_wait} and \texttt{psm\_test} may wait or test until progress is made on a single request. Other esoteric forms of progression such as \texttt{psm\_ipeek} that functions to query a particular MQ for non-blocking requests that are ready for completion.  Although requests "ready for completion" are not generally considered complete by MQ until they are returned to the MQ library through \texttt{psm\_wait} or \texttt{psm\_test}. 
+
+MQ messages are either received as expected or unexpected. The received message is expected if the incoming message tag matches the combination of tag and tag selector of at least one of the user-provided receive buffers preposted with psm2_mq_irecv or psm2_mq_irecv2.
+• The received message is unexpected if the incoming message tag doesn't match any combination of tag and tag selector from all the user-provided receive buffers preposted with psm2_mq_irecv or psm2_mq_irecv2.
+
+PSM/IPS-PTL Low level protocols
+-------------------------------
+
+
+
