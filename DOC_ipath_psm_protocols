@@ -1,0 +1,41 @@
+
+https://www.youtube.com/watch?v=rbB2drMqGPU
+
+++++++++++++++Notes+++++++++++++++
+The Intel® Performance Scaled Messaging 2 (Intel® PSM2) API is a high-performance, vendor-specific protocol that provides a low-level communications interface for the Intel® Omni-Path family of products. PSM2 enables mechanisms necessary to implement higher levelcommunications interfaces in parallel environments.
+
+PSM2 targets clusters of multicore processors and transparently implements two levels of communication: inter-node communication and intra-node shared memory communication.
+
+PSM2 includes new features and optimizations for Intel® Omni-Path hardware and processors
+
+PSM2 supports a larger 96-bit tag format, while Intel® True Scale PSM only supports 64-bit tags.
+
+PSM2 is currently a single-threaded library. This means that you cannot make any concurrent PSM2 library calls. 
+
+
+---- Endpoints -----
+PSM2 follows an endpoint communication model where an endpoint is defined as an object (or handle) instantiated to support sending and receiving messages to other endpoints. In order to prevent PSM2 from being tied to a particular parallel model (such as SPMD), you retain control over the parallel layout of endpoints. Opening endpoints (psm2_ep_open) and connecting endpoints to enable communication (psm2_ep_connect) are two decoupled mechanisms
+
+As a side effect, this greater flexibility allows you to manage a two-stage initialization process. In the first stage of opening an endpoint (psm2_ep_open), you obtain an opaque handle to the endpoint and a globally distributable endpoint identifier (psm2_epid_t). Prior to the second stage of connecting endpoints (psm2_ep_connect), you must distribute all relevant endpoint identifiers through an out-of-band mechanism. Once the endpoint identifiers are successfully distributed to all processes that wish to communicate, you connect all endpoint identifiers to the locally opened endpoint (psm2_ep_connect).
+
+-------- Components -------
+PSM2 exposes a single endpoint initialization model, but enables various levels of communication functionality and semantics through components. The first major component available in PSM2 is PSM2 Matched Queues (Intel® PSM2 Component Documentation on page 23). Matched Queues (MQ) present a queue-based communication model with the distinction that queue consumers use a 3-tuple of metadata to match incoming messages against a list of preposted receive buffers. The MQ semantics are sufficiently akin to MPI to cover the entire MPI-1.2 standard. With future releases of the PSM2 interface, more components may be exposed to accommodate users who implement parallel communication models that deviate from the Matched Queue semantics.
+
+MQ messages are either received as expected or unexpected:
+• The received message is expected if the incoming message tag matches the combination of tag and tag selector of at least one of the user-provided receive buffers preposted with psm2_mq_irecv or psm2_mq_irecv2.
+• The received message is unexpected if the incoming message tag doesn't match any combination of tag and tag selector from all the user-provided receive buffers preposted with psm2_mq_irecv or psm2_mq_irecv2.
+
+A successful MQ tag match requires a 3-tuple of unsigned 96-bit ints, two of which are provided by the receiver when posting a receive buffer (psm2_mq_irecv and psm2_mq_irecv2) and the last is provided by the sender as part of every message sent (psm2_mq_send and psm2_mq_isend). Since MQ is a receiver-directed communication model, the tag matching done at the receiver involves matching a sent message send tag (stag) with the tag (rtag) and tag selector (rtagsel) attached to every preposted receive buffer. The incoming stag is compared to the posted rtag but only for significant bits set in the rtagsel. The rtagsel can be used to mask off parts (or even all) of the bitwise comparison between sender and receiver tags. A successful match causes the message to be received into the buffer with which the tag is matched.
+
+---------- semantics and progression ------------
+Message completion in Matched Queues follows local completion semantics. When sending an MQ message, it is deemed complete when MQ guarantees that the source data has been sent and that the entire input source data memory location can be safely overwritten. As with standard Message Passing, MQ does not make any remote completion guarantees for sends.
+
+explicitly ensure progress on MQs for correctness. The progress requirement holds even if certain areas of the MQ implementation require less network attention than others, or if progress may internally be guaranteed through interrupts. The main polling function, psm2_poll, is the most general form of ensuring progress on a given endpoint. Calling psm2_poll ensures that progress is made over all the MQs and other components instantiated over the endpoint passed to psm2_poll.
+While psm2_poll is the only way to directly ensure progress, other MQ functions conditionally ensure progress depending on how they are used 
+
+psm2_mq_wait and psm2_mq_wait2 employ polling and wait until the request is completed. For blocking communication operations where the caller is waiting on a single send or receive to complete, psm2_mq_wait or psm2_mq_wait2 usually provides the best responsiveness in terms of latency.
+• psm2_mq_test and psm2_mq_test2 test a particular request for completion, but never directly or indirectly ensure progress because they only test the completion status of a request, nothing more. See functional documentation for psm2_mq_test and psm2_mq_test2 for details.
+
+############ Infinipath - PSM
+
+Infinipath PSM is  
